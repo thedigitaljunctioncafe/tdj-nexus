@@ -1,0 +1,6 @@
+{
+  "name": "TDJ NEXUS - Living Digital Universe 3D Live Wallpaper",
+  "description": "An interactive 3D live wallpaper and living digital universe featuring procedural geometry, dynamic particle physics, energy shockwaves, and dark luxury aesthetic.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
