@@ -1,10 +1,10 @@
 /**
- * TDJ NEXUS - Top Bar Navigation
+ * TDJ NEXUS - Top Bar Navigation (V1.1)
  * Adheres strictly to the 3-Zone Top Bar Contract.
  */
 
 import React from 'react';
-import { Sparkles, Sliders, Volume2, VolumeX, Monitor, Zap, Eye, EyeOff, Maximize2 } from 'lucide-react';
+import { Sparkles, Sliders, Volume2, VolumeX, Monitor, Zap, Eye, EyeOff, Maximize2, Gauge } from 'lucide-react';
 import { NexusConfig, SystemStats, THEME_PRESETS } from '../engine/types';
 
 interface TopNavProps {
@@ -39,23 +39,26 @@ export const TopNav: React.FC<TopNavProps> = ({
   };
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-30 flex items-center justify-between px-6 py-3 border-b border-white/10 bg-black/40 backdrop-blur-md select-none transition-all duration-300">
-      {/* Zone 1: Wordmark Single Text Element */}
-      <div className="flex items-center gap-3">
+    <header className="fixed top-0 left-0 right-0 z-30 flex items-center justify-between px-4 sm:px-6 py-2.5 sm:py-3 border-b border-white/10 bg-black/40 backdrop-blur-md select-none transition-all duration-300">
+      {/* Zone 1: Single Text Element Wordmark */}
+      <div className="flex items-center gap-2.5">
         <a 
           href="#nexus" 
           onClick={(e) => { e.preventDefault(); onTriggerShockwave(); }}
-          className="text-lg font-bold tracking-wider text-white font-display flex items-center gap-2 hover:opacity-90 transition-opacity"
+          className="text-base sm:text-lg font-bold tracking-wider text-white font-display flex items-center gap-2 hover:opacity-90 transition-opacity"
         >
-          <span className="w-2.5 h-2.5 rounded-full animate-pulse" style={{ backgroundColor: currentTheme.primaryColor }} />
+          <span 
+            className="w-2.5 h-2.5 rounded-full animate-pulse" 
+            style={{ backgroundColor: currentTheme.primaryColor }} 
+          />
           <span>TDJ NEXUS</span>
         </a>
       </div>
 
-      {/* Zone 2: 4-6 Clean Text Links / Control Affordances */}
-      <nav className="hidden md:flex items-center gap-6 text-xs font-medium text-slate-400">
+      {/* Zone 2: 4-6 Clean Navigation Affordances */}
+      <nav className="hidden lg:flex items-center gap-5 xl:gap-6 text-xs font-medium text-slate-400">
         <button
-          onClick={() => { onOpenDeck('themes'); }}
+          onClick={() => onOpenDeck('themes')}
           className="hover:text-white transition-colors cursor-pointer flex items-center gap-1.5"
         >
           <Sparkles className="w-3.5 h-3.5" style={{ color: currentTheme.primaryColor }} />
@@ -63,7 +66,15 @@ export const TopNav: React.FC<TopNavProps> = ({
         </button>
 
         <button
-          onClick={() => { onOpenDeck('physics'); }}
+          onClick={() => onOpenDeck('quality')}
+          className="hover:text-white transition-colors cursor-pointer flex items-center gap-1.5"
+        >
+          <Gauge className="w-3.5 h-3.5 text-purple-400" />
+          <span className="uppercase">{config.quality} Quality</span>
+        </button>
+
+        <button
+          onClick={() => onOpenDeck('physics')}
           className="hover:text-white transition-colors cursor-pointer flex items-center gap-1.5"
         >
           <Sliders className="w-3.5 h-3.5" />
@@ -71,9 +82,7 @@ export const TopNav: React.FC<TopNavProps> = ({
         </button>
 
         <button
-          onClick={() => {
-            onUpdateConfig({ soundEnabled: !config.soundEnabled });
-          }}
+          onClick={() => onUpdateConfig({ soundEnabled: !config.soundEnabled })}
           className="hover:text-white transition-colors cursor-pointer flex items-center gap-1.5"
         >
           {config.soundEnabled ? (
@@ -84,7 +93,7 @@ export const TopNav: React.FC<TopNavProps> = ({
           ) : (
             <>
               <VolumeX className="w-3.5 h-3.5 text-slate-500" />
-              <span>Audio Muted</span>
+              <span>Muted</span>
             </>
           )}
         </button>
@@ -94,39 +103,34 @@ export const TopNav: React.FC<TopNavProps> = ({
           className="hover:text-cyan-300 transition-colors cursor-pointer flex items-center gap-1.5 text-slate-300"
         >
           <Monitor className="w-3.5 h-3.5 text-cyan-400" />
-          <span>Windows Wallpaper Setup</span>
+          <span>Windows Live Wallpaper</span>
         </button>
       </nav>
 
-      {/* Zone 3: Primary Actions */}
-      <div className="flex items-center gap-2.5">
-        {/* Real telemetry badge (unboxed clean text) */}
-        <div className="hidden lg:flex items-center gap-2 text-xs font-mono text-slate-400 tabular-nums px-2">
-          <span>{stats.fps} FPS</span>
+      {/* Zone 3: Primary Action Buttons */}
+      <div className="flex items-center gap-2 sm:gap-2.5">
+        <div className="hidden md:flex items-center gap-2 text-xs font-mono text-slate-400 tabular-nums px-1.5">
+          <span className="text-emerald-400 font-semibold">{stats.fps} FPS</span>
           <span aria-hidden="true" className="text-slate-600">·</span>
           <span>{stats.particleCount.toLocaleString()} P</span>
         </div>
 
         <button
           onClick={onTriggerShockwave}
-          className="px-3 py-1.5 text-xs font-medium text-white rounded-lg transition-all cursor-pointer flex items-center gap-1.5 border border-white/10 hover:border-white/30 bg-white/5 hover:bg-white/10"
-          title="Trigger Energy Shockwave (Spacebar)"
+          className="px-2.5 sm:px-3 py-1.5 text-xs font-medium text-white rounded-lg transition-all cursor-pointer flex items-center gap-1.5 border border-white/10 hover:border-white/30 bg-white/5 hover:bg-white/10"
+          title="Trigger Energy Shockwave (Spacebar / Click)"
         >
           <Zap className="w-3.5 h-3.5 text-amber-400" />
           <span className="hidden sm:inline">Pulse</span>
         </button>
 
         <button
-          onClick={() => onUpdateConfig({ wallpaperMode: !config.wallpaperMode })}
-          className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
-            config.wallpaperMode
-              ? 'bg-cyan-500 text-black font-semibold'
-              : 'bg-white/10 text-white hover:bg-white/20 border border-white/10'
-          }`}
-          title="Toggle Wallpaper Clean Mode (H)"
+          onClick={() => onUpdateConfig({ wallpaperMode: true })}
+          className="px-2.5 sm:px-3 py-1.5 text-xs font-medium rounded-lg transition-all cursor-pointer flex items-center gap-1.5 bg-white/10 text-white hover:bg-white/20 border border-white/10"
+          title="Toggle Clean Wallpaper Mode (H)"
         >
-          {config.wallpaperMode ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-          <span>{config.wallpaperMode ? 'Clean' : 'Wallpaper'}</span>
+          <EyeOff className="w-3.5 h-3.5 text-cyan-400" />
+          <span>Wallpaper (H)</span>
         </button>
 
         <button

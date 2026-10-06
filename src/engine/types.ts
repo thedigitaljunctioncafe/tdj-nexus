@@ -1,6 +1,9 @@
 /**
  * TDJ NEXUS - Type Definitions and Configuration Schemas
+ * 100% Local, Offline Interactive 3D Live Wallpaper Engine
  */
+
+export type QualityLevel = 'auto' | 'low' | 'balanced' | 'high' | 'ultra';
 
 export interface ThemeConfig {
   id: string;
@@ -17,6 +20,7 @@ export interface ThemeConfig {
 
 export interface NexusConfig {
   themeId: string;
+  quality: QualityLevel;
   particleCount: number;
   particleSpeed: number;
   particleSize: number;
@@ -35,7 +39,7 @@ export interface NexusConfig {
   ambientDrone: boolean;
   bloomGlow: number;
   fov: number;
-  wallpaperMode: boolean; // Auto-hide UI for clean desktop wallpaper
+  wallpaperMode: boolean; // True clean desktop wallpaper mode
 }
 
 export interface SystemStats {
@@ -44,7 +48,41 @@ export interface SystemStats {
   particleCount: number;
   drawCalls: number;
   triangles: number;
+  effectiveQuality: QualityLevel;
+  gpuDpr: number;
 }
+
+export const QUALITY_PRESETS: Record<Exclude<QualityLevel, 'auto'>, {
+  particleCount: number;
+  maxDpr: number;
+  particleSize: number;
+  nebulaComplexity: number;
+}> = {
+  low: {
+    particleCount: 4000,
+    maxDpr: 1.0,
+    particleSize: 1.4,
+    nebulaComplexity: 1
+  },
+  balanced: {
+    particleCount: 9000,
+    maxDpr: 1.25,
+    particleSize: 1.2,
+    nebulaComplexity: 2
+  },
+  high: {
+    particleCount: 15000,
+    maxDpr: 1.5,
+    particleSize: 1.1,
+    nebulaComplexity: 3
+  },
+  ultra: {
+    particleCount: 24000,
+    maxDpr: 2.0,
+    particleSize: 1.0,
+    nebulaComplexity: 4
+  }
+};
 
 export const THEME_PRESETS: Record<string, ThemeConfig> = {
   obsidian_cyan: {
@@ -123,6 +161,7 @@ export const THEME_PRESETS: Record<string, ThemeConfig> = {
 
 export const DEFAULT_CONFIG: NexusConfig = {
   themeId: 'obsidian_cyan',
+  quality: 'auto',
   particleCount: 12000,
   particleSpeed: 1.0,
   particleSize: 1.2,
@@ -140,6 +179,6 @@ export const DEFAULT_CONFIG: NexusConfig = {
   soundVolume: 0.6,
   ambientDrone: false,
   bloomGlow: 1.0,
-  fov: 60,
+  fov: 55,
   wallpaperMode: false
 };

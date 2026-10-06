@@ -1,5 +1,5 @@
 /**
- * TDJ NEXUS - High-Performance Particle Swarm System
+ * TDJ NEXUS - High-Performance Particle Swarm System (V1.1)
  * GPU-accelerated volumetric particle field with interactive cursor deflection and shockwaves.
  */
 
@@ -11,10 +11,10 @@ export class ParticleSystem {
   public points: THREE.Points;
   private geometry: THREE.BufferGeometry;
   private shaderMaterial: THREE.ShaderMaterial;
-  private maxCount: number = 25000;
+  private maxCount: number = 26000;
   private activeCount: number = 12000;
 
-  // CPU buffer references for re-seeding
+  // CPU buffer references
   private positions: Float32Array;
   private sizes: Float32Array;
   private phases: Float32Array;
@@ -26,7 +26,7 @@ export class ParticleSystem {
   private shockwaveOrigin: THREE.Vector3 = new THREE.Vector3(0, 0, 0);
   private shockwaveProgress: number = -1.0;
   private shockwaveRadius: number = 0.0;
-  private shockwaveMaxRadius: number = 45.0;
+  private shockwaveMaxRadius: number = 48.0;
 
   constructor(count: number, theme: ThemeConfig) {
     this.activeCount = Math.min(count, this.maxCount);
@@ -67,7 +67,6 @@ export class ParticleSystem {
     for (let i = 0; i < this.maxCount; i++) {
       const i3 = i * 3;
 
-      // Create a cosmic spherical distribution with denser core cluster and outer halo
       const isCoreCluster = Math.random() < 0.45;
       const radius = isCoreCluster
         ? 3.0 + Math.pow(Math.random(), 1.5) * 12.0
@@ -76,7 +75,6 @@ export class ParticleSystem {
       const theta = Math.random() * Math.PI * 2;
       const phi = Math.acos(Math.random() * 2 - 1);
 
-      // Flatten slightly on Y to form an accretion disk/galaxy plane
       const flattenY = 0.65;
       const x = radius * Math.sin(phi) * Math.cos(theta);
       const y = radius * Math.cos(phi) * flattenY;
@@ -91,7 +89,6 @@ export class ParticleSystem {
       this.speeds[i] = (Math.random() * 0.8 + 0.2) * (Math.random() < 0.5 ? 1 : -1);
       this.orbitRadii[i] = radius;
 
-      // Tangential velocity for orbital swirl
       const speed = Math.random() * 0.5 + 0.1;
       this.velocities[i3] = -Math.sin(theta) * speed;
       this.velocities[i3 + 1] = (Math.random() - 0.5) * 0.2;
@@ -112,7 +109,7 @@ export class ParticleSystem {
     this.shockwaveOrigin.copy(origin);
     this.shockwaveProgress = 0.0;
     this.shockwaveRadius = 0.0;
-    this.shockwaveMaxRadius = 45.0 * Math.max(0.6, intensity);
+    this.shockwaveMaxRadius = 48.0 * Math.max(0.6, intensity);
   }
 
   public update(
@@ -122,14 +119,12 @@ export class ParticleSystem {
     cursorForce: number,
     speedMultiplier: number
   ) {
-    // 1. Update uniforms
     this.shaderMaterial.uniforms.uTime.value = time * speedMultiplier;
     this.shaderMaterial.uniforms.uCursorPos.value.copy(cursor3D);
     this.shaderMaterial.uniforms.uCursorForce.value = cursorForce;
 
-    // 2. Shockwave animation progression
     if (this.shockwaveProgress >= 0.0) {
-      this.shockwaveProgress += delta * 0.9;
+      this.shockwaveProgress += delta * 0.95;
       this.shockwaveRadius = this.shockwaveProgress * this.shockwaveMaxRadius;
 
       if (this.shockwaveProgress > 1.0) {
@@ -143,7 +138,6 @@ export class ParticleSystem {
       this.shaderMaterial.uniforms.uShockwaveProgress.value = -1.0;
     }
 
-    // 3. Slow global system rotation
     this.points.rotation.y = time * 0.04 * speedMultiplier;
   }
 
@@ -154,5 +148,10 @@ export class ParticleSystem {
 
   public setPixelRatio(dpr: number) {
     this.shaderMaterial.uniforms.uPixelRatio.value = dpr;
+  }
+
+  public dispose() {
+    this.geometry.dispose();
+    this.shaderMaterial.dispose();
   }
 }

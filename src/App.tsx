@@ -1,6 +1,6 @@
 /**
- * TDJ NEXUS - Living Digital Universe 3D Live Wallpaper
- * Free, local, Windows wallpaper compatible interactive 3D WebGL engine.
+ * TDJ NEXUS - Living Digital Universe 3D Live Wallpaper (V1.1 Production Upgrade)
+ * 100% Free, Offline-capable, Windows-compatible interactive 3D WebGL engine.
  */
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
@@ -21,12 +21,15 @@ export default function App() {
     frameTime: 16.6,
     particleCount: DEFAULT_CONFIG.particleCount,
     drawCalls: 0,
-    triangles: 0
+    triangles: 0,
+    effectiveQuality: 'high',
+    gpuDpr: 1.0
   });
 
   const [isDeckOpen, setIsDeckOpen] = useState<boolean>(false);
   const [deckTab, setDeckTab] = useState<string>('themes');
   const [isGuideOpen, setIsGuideOpen] = useState<boolean>(false);
+  const [modeNotice, setModeNotice] = useState<string | null>(null);
 
   // Initialize Three.js Scene
   useEffect(() => {
@@ -52,6 +55,11 @@ export default function App() {
       }
       return updated;
     });
+
+    if (newConfig.wallpaperMode !== undefined) {
+      setModeNotice(newConfig.wallpaperMode ? 'Clean Wallpaper Mode Active (Press H to restore UI)' : 'UI Restored');
+      setTimeout(() => setModeNotice(null), 2500);
+    }
   }, []);
 
   // Trigger Shockwave
@@ -67,10 +75,9 @@ export default function App() {
     setIsDeckOpen(true);
   }, []);
 
-  // Keyboard shortcut listeners
+  // Global Keyboard Shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Avoid hotkeys if user is typing in an input
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
         return;
       }
@@ -118,44 +125,50 @@ export default function App() {
         className="absolute inset-0 w-full h-full cursor-crosshair z-0"
       />
 
-      {/* Top Bar Navigation (Hidden in Wallpaper Mode) */}
-      {!config.wallpaperMode && (
-        <TopNav
-          config={config}
-          onUpdateConfig={handleUpdateConfig}
-          onTriggerShockwave={handleTriggerShockwave}
-          onOpenDeck={handleOpenDeck}
-          onOpenGuide={() => setIsGuideOpen(true)}
-          stats={stats}
-          isDeckOpen={isDeckOpen}
-          onToggleDeck={() => setIsDeckOpen(!isDeckOpen)}
-        />
+      {/* Brief Auto-Fading Wallpaper Notification Toast */}
+      {modeNotice && (
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 px-4 py-2 bg-black/80 backdrop-blur-md border border-cyan-500/30 rounded-xl text-cyan-300 text-xs font-mono shadow-2xl animate-in fade-in slide-in-from-top-3 duration-300 pointer-events-none">
+          {modeNotice}
+        </div>
       )}
 
-      {/* Interactive Control Deck Drawer */}
-      <ControlDeck
-        isOpen={isDeckOpen && !config.wallpaperMode}
-        onClose={() => setIsDeckOpen(false)}
-        config={config}
-        onUpdateConfig={handleUpdateConfig}
-        onTriggerShockwave={handleTriggerShockwave}
-        stats={stats}
-        initialTab={deckTab}
-      />
+      {/* Full Studio UI (100% hidden in True Clean Wallpaper Mode) */}
+      {!config.wallpaperMode && (
+        <>
+          <TopNav
+            config={config}
+            onUpdateConfig={handleUpdateConfig}
+            onTriggerShockwave={handleTriggerShockwave}
+            onOpenDeck={handleOpenDeck}
+            onOpenGuide={() => setIsGuideOpen(true)}
+            stats={stats}
+            isDeckOpen={isDeckOpen}
+            onToggleDeck={() => setIsDeckOpen(!isDeckOpen)}
+          />
 
-      {/* Windows Wallpaper Setup Guide Modal */}
-      <WindowsGuideModal
-        isOpen={isGuideOpen}
-        onClose={() => setIsGuideOpen(false)}
-      />
+          <ControlDeck
+            isOpen={isDeckOpen}
+            onClose={() => setIsDeckOpen(false)}
+            config={config}
+            onUpdateConfig={handleUpdateConfig}
+            onTriggerShockwave={handleTriggerShockwave}
+            stats={stats}
+            initialTab={deckTab}
+          />
 
-      {/* Wallpaper HUD & Shortcut Overlay */}
-      <WallpaperOverlay
-        isWallpaperMode={config.wallpaperMode}
-        onExitWallpaperMode={() => handleUpdateConfig({ wallpaperMode: false })}
-        onTriggerShockwave={handleTriggerShockwave}
-        theme={currentTheme}
-      />
+          <WindowsGuideModal
+            isOpen={isGuideOpen}
+            onClose={() => setIsGuideOpen(false)}
+          />
+
+          <WallpaperOverlay
+            isWallpaperMode={false}
+            onExitWallpaperMode={() => handleUpdateConfig({ wallpaperMode: false })}
+            onTriggerShockwave={handleTriggerShockwave}
+            theme={currentTheme}
+          />
+        </>
+      )}
     </div>
   );
 }

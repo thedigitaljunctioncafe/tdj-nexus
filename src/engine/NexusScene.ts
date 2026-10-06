@@ -1,15 +1,22 @@
 /**
- * TDJ NEXUS - Master 3D Scene Orchestrator
- * Connects NexusCore, ParticleSystem, ShockwaveSystem, and Interactive Parallax.
+ * TDJ NEXUS - Master 3D Scene Orchestrator (V1.1 Production Upgrade)
+ * Connects NexusCore, ParticleSystem, ShockwaveSystem, Shader-based Nebula, Adaptive Performance, and Cinematic Camera.
  */
 
 import * as THREE from 'three';
 import { NexusCore } from './NexusCore';
 import { ParticleSystem } from './ParticleSystem';
 import { ShockwaveSystem } from './ShockwaveSystem';
-import { DeepGridShader } from './shaders';
+import { DeepGridShader, CosmicNebulaShader } from './shaders';
 import { audioSynth } from './audioSynth';
-import { NexusConfig, SystemStats, THEME_PRESETS, ThemeConfig } from './types';
+import { 
+  NexusConfig, 
+  SystemStats, 
+  THEME_PRESETS, 
+  ThemeConfig, 
+  QualityLevel,
+  QUALITY_PRESETS 
+} from './types';
 
 export class NexusScene {
   private container: HTMLElement;
@@ -22,11 +29,16 @@ export class NexusScene {
   public particles: ParticleSystem;
   public shockwaves: ShockwaveSystem;
 
-  // Background environment
+  // Environment & Shaders
   private spatialGridTop: THREE.Mesh;
   private spatialGridBottom: THREE.Mesh;
   private gridMaterial: THREE.ShaderMaterial;
-  private nebulaGroup: THREE.Group;
+  private gridGeo: THREE.PlaneGeometry;
+
+  private nebulaDome: THREE.Mesh;
+  private nebulaMaterial: THREE.ShaderMaterial;
+  private nebulaGeo: THREE.SphereGeometry;
+
   private ambientLight: THREE.AmbientLight;
   private corePointLight: THREE.PointLight;
   private rimLight: THREE.DirectionalLight;
@@ -37,22 +49,30 @@ export class NexusScene {
   private animationFrameId: number | null = null;
   private clock: THREE.Clock;
 
-  // Interaction coordinates
+  // Cinematic Camera & Parallax (Pre-allocated, 0 allocations per frame)
   private mouseNorm: THREE.Vector2 = new THREE.Vector2(0, 0);
   private targetMouseNorm: THREE.Vector2 = new THREE.Vector2(0, 0);
   private cursor3D: THREE.Vector3 = new THREE.Vector3(0, 0, 0);
   private raycaster: THREE.Raycaster = new THREE.Raycaster();
   private planeZ: THREE.Plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
+  private camLookTarget: THREE.Vector3 = new THREE.Vector3(0, 0, 0);
+  private baseCamDistance: number = 22.0;
 
-  // Performance telemetry
+  // Adaptive Performance Monitoring
   private frameCount: number = 0;
   private lastFpsUpdate: number = 0;
+  private lowFpsCounter: number = 0;
+  private highFpsCounter: number = 0;
+  private currentAutoTier: number = 2; // 0: low, 1: balanced, 2: high, 3: ultra
+  private currentDpr: number = 1.0;
   private stats: SystemStats = {
     fps: 60,
     frameTime: 16.6,
     particleCount: 12000,
     drawCalls: 0,
-    triangles: 0
+    triangles: 0,
+    effectiveQuality: 'high',
+    gpuDpr: 1.0
   };
   private onStatsUpdate?: (stats: SystemStats) => void;
 
@@ -72,11 +92,13 @@ export class NexusScene {
     this.scene.background = new THREE.Color(this.theme.backgroundColor);
     this.scene.fog = new THREE.FogExp2(this.theme.fogColor, 0.015);
 
-    // 2. Camera
+    // 2. Camera with Adaptive Aspect Ratio Framing
     const width = container.clientWidth || window.innerWidth;
     const height = container.clientHeight || window.innerHeight;
-    this.camera = new THREE.PerspectiveCamera(this.config.fov, width / height, 0.1, 300);
-    this.camera.position.set(0, 0, 22);
+    const aspect = width / height;
+
+    this.camera = new THREE.PerspectiveCamera(this.config.fov, aspect, 0.1, 400);
+    this.updateCameraFraming(aspect);
 
     // 3. High-Performance WebGL Renderer
     this.renderer = new THREE.WebGLRenderer({
@@ -87,20 +109,20 @@ export class NexusScene {
       depth: true
     });
     this.renderer.setSize(width, height);
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    this.applyQualitySettings();
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.1;
+    this.renderer.toneMappingExposure = 1.15;
     this.container.appendChild(this.renderer.domElement);
 
-    // 4. Initialize Lighting
-    this.ambientLight = new THREE.AmbientLight(0x1a2035, 1.2);
+    // 4. Lighting Setup
+    this.ambientLight = new THREE.AmbientLight(0x141a2c, 1.2);
     this.scene.add(this.ambientLight);
 
-    this.corePointLight = new THREE.PointLight(this.theme.primaryColor, 3.5, 30, 1.5);
+    this.corePointLight = new THREE.PointLight(this.theme.primaryColor, 3.8, 35, 1.5);
     this.corePointLight.position.set(0, 0, 0);
     this.scene.add(this.corePointLight);
 
-    this.rimLight = new THREE.DirectionalLight(this.theme.secondaryColor, 1.8);
+    this.rimLight = new THREE.DirectionalLight(this.theme.secondaryColor, 1.9);
     this.rimLight.position.set(5, 10, 8);
     this.scene.add(this.rimLight);
 
@@ -114,7 +136,7 @@ export class NexusScene {
     this.shockwaves = new ShockwaveSystem(this.theme);
     this.scene.add(this.shockwaves.group);
 
-    // 6. Build Environment Grid Matrix & Cosmic Clouds
+    // 6. Build Spatial Grid Matrix
     this.gridMaterial = new THREE.ShaderMaterial({
       vertexShader: DeepGridShader.vertexShader,
       fragmentShader: DeepGridShader.fragmentShader,
@@ -126,56 +148,91 @@ export class NexusScene {
     });
     this.gridMaterial.uniforms.uGridColor.value = new THREE.Color(this.theme.gridColor);
 
-    const gridGeo = new THREE.PlaneGeometry(160, 160);
-    this.spatialGridBottom = new THREE.Mesh(gridGeo, this.gridMaterial);
-    this.spatialGridBottom.position.y = -10;
+    this.gridGeo = new THREE.PlaneGeometry(180, 180);
+    this.spatialGridBottom = new THREE.Mesh(this.gridGeo, this.gridMaterial);
+    this.spatialGridBottom.position.y = -10.5;
     this.spatialGridBottom.rotation.x = -Math.PI / 2;
     this.scene.add(this.spatialGridBottom);
 
-    this.spatialGridTop = new THREE.Mesh(gridGeo, this.gridMaterial);
-    this.spatialGridTop.position.y = 10;
+    this.spatialGridTop = new THREE.Mesh(this.gridGeo, this.gridMaterial);
+    this.spatialGridTop.position.y = 10.5;
     this.spatialGridTop.rotation.x = Math.PI / 2;
     this.scene.add(this.spatialGridTop);
 
-    // Nebula volumetric clouds
-    this.nebulaGroup = new THREE.Group();
-    this.createCosmicNebula();
-    this.scene.add(this.nebulaGroup);
+    // 7. Advanced Shader-Based Cosmic Nebula
+    this.nebulaMaterial = new THREE.ShaderMaterial({
+      vertexShader: CosmicNebulaShader.vertexShader,
+      fragmentShader: CosmicNebulaShader.fragmentShader,
+      uniforms: THREE.UniformsUtils.clone(CosmicNebulaShader.uniforms),
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      side: THREE.BackSide,
+      depthWrite: false
+    });
+    this.updateNebulaUniforms();
 
-    // 7. Event Handlers
+    this.nebulaGeo = new THREE.SphereGeometry(60, 32, 32);
+    this.nebulaDome = new THREE.Mesh(this.nebulaGeo, this.nebulaMaterial);
+    this.scene.add(this.nebulaDome);
+
+    // 8. Event Listeners
     this.setupEventListeners();
 
-    // 8. Start Render Loop
+    // 9. Start Render Loop
     this.animate = this.animate.bind(this);
     this.animate();
   }
 
-  private createCosmicNebula() {
-    const cloudCount = 6;
-    const cloudGeo = new THREE.SphereGeometry(18, 16, 16);
-    
-    for (let i = 0; i < cloudCount; i++) {
-      const cloudMat = new THREE.MeshBasicMaterial({
-        color: new THREE.Color(this.theme.secondaryColor),
-        transparent: true,
-        opacity: 0.04,
-        blending: THREE.AdditiveBlending,
-        wireframe: true,
-        side: THREE.BackSide
-      });
-      const cloudMesh = new THREE.Mesh(cloudGeo, cloudMat);
-      cloudMesh.position.set(
-        (Math.random() - 0.5) * 40,
-        (Math.random() - 0.5) * 20,
-        (Math.random() - 0.5) * 30 - 15
-      );
-      cloudMesh.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, 0);
-      cloudMesh.scale.set(
-        1.0 + Math.random() * 0.8,
-        0.6 + Math.random() * 0.5,
-        1.0 + Math.random() * 0.8
-      );
-      this.nebulaGroup.add(cloudMesh);
+  private updateCameraFraming(aspect: number) {
+    // Dynamic distance calculation to keep Nexus Core beautifully centered across 32:9, 21:9, 16:9, and 9:16 portrait
+    if (aspect < 1.0) {
+      // Portrait / Mobile: pull back camera so wide gyro rings don't clip
+      this.baseCamDistance = 22.0 / aspect * 0.75;
+      this.camera.fov = Math.min(75, this.config.fov * 1.15);
+    } else if (aspect > 2.2) {
+      // Ultra-wide (21:9, 32:9): keep immersive focal scale
+      this.baseCamDistance = 21.0;
+      this.camera.fov = Math.max(45, this.config.fov * 0.9);
+    } else {
+      // Standard 16:9 / 16:10
+      this.baseCamDistance = 22.0;
+      this.camera.fov = this.config.fov;
+    }
+    this.camera.position.set(0, 0, this.baseCamDistance);
+    this.camera.updateProjectionMatrix();
+  }
+
+  private updateNebulaUniforms() {
+    this.nebulaMaterial.uniforms.uColorPrimary.value.copy(new THREE.Color(this.theme.primaryColor));
+    this.nebulaMaterial.uniforms.uColorSecondary.value.copy(new THREE.Color(this.theme.secondaryColor));
+    this.nebulaMaterial.uniforms.uColorDeep.value.copy(new THREE.Color(this.theme.backgroundColor));
+  }
+
+  private applyQualitySettings() {
+    let effectiveDpr = Math.min(window.devicePixelRatio, 2.0);
+    let targetParticleCount = this.config.particleCount;
+
+    if (this.config.quality !== 'auto') {
+      const preset = QUALITY_PRESETS[this.config.quality];
+      effectiveDpr = Math.min(window.devicePixelRatio, preset.maxDpr);
+      targetParticleCount = preset.particleCount;
+      if (this.particles) {
+        this.particles.setParticleSize(preset.particleSize);
+      }
+    } else {
+      // Adaptive mode
+      const tiers: (keyof typeof QUALITY_PRESETS)[] = ['low', 'balanced', 'high', 'ultra'];
+      const currentTierKey = tiers[this.currentAutoTier];
+      const preset = QUALITY_PRESETS[currentTierKey];
+      effectiveDpr = Math.min(window.devicePixelRatio, preset.maxDpr);
+      targetParticleCount = preset.particleCount;
+    }
+
+    this.currentDpr = effectiveDpr;
+    this.renderer.setPixelRatio(effectiveDpr);
+    if (this.particles) {
+      this.particles.setParticleCount(targetParticleCount);
+      this.particles.setPixelRatio(effectiveDpr);
     }
   }
 
@@ -184,7 +241,6 @@ export class NexusScene {
     window.addEventListener('pointermove', this.handlePointerMove);
     this.container.addEventListener('pointerdown', this.handlePointerDown);
 
-    // Context lost recovery
     this.renderer.domElement.addEventListener('webglcontextlost', (e) => {
       e.preventDefault();
       if (this.animationFrameId) {
@@ -201,29 +257,24 @@ export class NexusScene {
     if (!this.container) return;
     const width = this.container.clientWidth || window.innerWidth;
     const height = this.container.clientHeight || window.innerHeight;
-    this.camera.aspect = width / height;
-    this.camera.updateProjectionMatrix();
+    const aspect = width / height;
+
+    this.camera.aspect = aspect;
+    this.updateCameraFraming(aspect);
     this.renderer.setSize(width, height);
-    this.particles.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    this.applyQualitySettings();
   };
 
   private handlePointerMove = (e: MouseEvent | PointerEvent) => {
-    // Normalized device coordinates (-1 to +1)
     const x = (e.clientX / window.innerWidth) * 2 - 1;
     const y = -(e.clientY / window.innerHeight) * 2 + 1;
     this.targetMouseNorm.set(x, y);
 
-    // Unproject to 3D world plane at Z=0 for interactive particle physics
-    this.raycaster.setFromCamera(new THREE.Vector2(x, y), this.camera);
-    const intersect = new THREE.Vector3();
-    this.raycaster.ray.intersectPlane(this.planeZ, intersect);
-    if (intersect) {
-      this.cursor3D.copy(intersect);
-    }
+    this.raycaster.setFromCamera(this.targetMouseNorm, this.camera);
+    this.raycaster.ray.intersectPlane(this.planeZ, this.cursor3D);
   };
 
   private handlePointerDown = (e: MouseEvent | PointerEvent) => {
-    // Only trigger if click was inside container
     const x = (e.clientX / window.innerWidth) * 2 - 1;
     const y = -(e.clientY / window.innerHeight) * 2 + 1;
     
@@ -231,7 +282,7 @@ export class NexusScene {
     const intersect = new THREE.Vector3();
     this.raycaster.ray.intersectPlane(this.planeZ, intersect);
 
-    const spawnPos = intersect || new THREE.Vector3(0, 0, 0);
+    const spawnPos = intersect || this.cursor3D;
     this.triggerShockwave(spawnPos, this.config.shockwaveIntensity);
 
     if (this.config.soundEnabled) {
@@ -251,22 +302,22 @@ export class NexusScene {
     const delta = Math.min(this.clock.getDelta(), 0.1);
     const time = this.clock.getElapsedTime();
 
-    // 1. Smooth Camera Parallax Lerp
-    this.mouseNorm.lerp(this.targetMouseNorm, delta * 4.5);
+    // 1. Cinematic Camera: Smooth Parallax & Subtle Idle Harmonic Breathing
+    this.mouseNorm.lerp(this.targetMouseNorm, delta * 3.8);
     
     const parallax = this.config.parallaxStrength;
-    const targetCamX = this.mouseNorm.x * 4.0 * parallax;
-    const targetCamY = this.mouseNorm.y * 2.5 * parallax;
+    // Subtle Lissajous continuous drift for organic cinematic feel
+    const idleDriftX = Math.sin(time * 0.35) * 0.8;
+    const idleDriftY = Math.cos(time * 0.28) * 0.5;
 
-    this.camera.position.x += (targetCamX - this.camera.position.x) * (delta * 3.0);
-    this.camera.position.y += (targetCamY - this.camera.position.y) * (delta * 3.0);
-    this.camera.lookAt(0, 0, 0);
+    const targetCamX = (this.mouseNorm.x * 4.2 + idleDriftX) * parallax;
+    const targetCamY = (this.mouseNorm.y * 2.6 + idleDriftY) * parallax;
 
-    // Slight dynamic FOV breathing
-    this.camera.fov = this.config.fov + Math.sin(time * 0.8) * 0.5;
-    this.camera.updateProjectionMatrix();
+    this.camera.position.x += (targetCamX - this.camera.position.x) * (delta * 2.8);
+    this.camera.position.y += (targetCamY - this.camera.position.y) * (delta * 2.8);
+    this.camera.lookAt(this.camLookTarget);
 
-    // 2. Update Subsystems
+    // 2. Update Subsystems (Zero per-frame allocations)
     this.core.update(delta, time, this.config.coreRotationSpeed);
     this.particles.update(
       delta,
@@ -279,27 +330,57 @@ export class NexusScene {
 
     // 3. Update Environment Uniforms
     this.gridMaterial.uniforms.uTime.value = time;
-    this.nebulaGroup.rotation.y = time * 0.02;
-    this.nebulaGroup.rotation.z = Math.sin(time * 0.05) * 0.1;
+    this.nebulaMaterial.uniforms.uTime.value = time;
+    this.nebulaDome.rotation.y = time * 0.015;
 
     // 4. Render Frame
     this.renderer.render(this.scene, this.camera);
 
-    // 5. Performance Telemetry Calculation
+    // 5. Adaptive Performance Telemetry & Automatic Scaling
     this.frameCount++;
     if (time - this.lastFpsUpdate >= 0.5) {
-      const fps = Math.round(this.frameCount / (time - this.lastFpsUpdate));
+      const elapsed = time - this.lastFpsUpdate;
+      const currentFps = Math.round(this.frameCount / elapsed);
       const info = this.renderer.info;
+
+      // Auto-tuning algorithm
+      if (this.config.quality === 'auto') {
+        if (currentFps < 45) {
+          this.lowFpsCounter++;
+          this.highFpsCounter = 0;
+          if (this.lowFpsCounter >= 3 && this.currentAutoTier > 0) {
+            this.currentAutoTier--;
+            this.lowFpsCounter = 0;
+            this.applyQualitySettings();
+          }
+        } else if (currentFps > 57) {
+          this.highFpsCounter++;
+          this.lowFpsCounter = 0;
+          if (this.highFpsCounter >= 6 && this.currentAutoTier < 3) {
+            this.currentAutoTier++;
+            this.highFpsCounter = 0;
+            this.applyQualitySettings();
+          }
+        }
+      }
+
+      const tiers: QualityLevel[] = ['low', 'balanced', 'high', 'ultra'];
+      const effectiveQuality = this.config.quality === 'auto' ? tiers[this.currentAutoTier] : this.config.quality;
+
       this.stats = {
-        fps: Math.min(fps, 144),
+        fps: Math.min(currentFps, 144),
         frameTime: parseFloat((delta * 1000).toFixed(1)),
-        particleCount: this.config.particleCount,
+        particleCount: this.particles['activeCount'] || this.config.particleCount,
         drawCalls: info.render.calls,
-        triangles: info.render.triangles
+        triangles: info.render.triangles,
+        effectiveQuality,
+        gpuDpr: parseFloat(this.currentDpr.toFixed(2))
       };
+
       if (this.onStatsUpdate) {
         this.onStatsUpdate(this.stats);
       }
+
       this.frameCount = 0;
       this.lastFpsUpdate = time;
     }
@@ -312,7 +393,11 @@ export class NexusScene {
       this.setTheme(THEME_PRESETS[newConfig.themeId]);
     }
 
-    if (newConfig.particleCount !== undefined) {
+    if (newConfig.quality !== undefined) {
+      this.applyQualitySettings();
+    }
+
+    if (newConfig.particleCount !== undefined && this.config.quality !== 'auto') {
       this.particles.setParticleCount(newConfig.particleCount);
     }
 
@@ -326,7 +411,7 @@ export class NexusScene {
     }
 
     if (newConfig.showNebula !== undefined) {
-      this.nebulaGroup.visible = newConfig.showNebula;
+      this.nebulaDome.visible = newConfig.showNebula;
     }
 
     if (newConfig.coreScale !== undefined) {
@@ -368,13 +453,7 @@ export class NexusScene {
     this.core.applyTheme(theme);
     this.particles.applyTheme(theme);
     this.shockwaves.applyTheme(theme);
-
-    // Update nebula cloud colors
-    this.nebulaGroup.children.forEach(child => {
-      if (child instanceof THREE.Mesh) {
-        (child.material as THREE.MeshBasicMaterial).color.copy(new THREE.Color(theme.secondaryColor));
-      }
-    });
+    this.updateNebulaUniforms();
   }
 
   public dispose() {
@@ -386,6 +465,15 @@ export class NexusScene {
     this.container.removeEventListener('pointerdown', this.handlePointerDown);
 
     audioSynth.stopAmbientDrone();
+
+    this.core.dispose();
+    this.particles.dispose();
+    this.shockwaves.dispose();
+
+    this.gridGeo.dispose();
+    this.gridMaterial.dispose();
+    this.nebulaGeo.dispose();
+    this.nebulaMaterial.dispose();
 
     this.renderer.dispose();
     if (this.container.contains(this.renderer.domElement)) {

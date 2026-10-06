@@ -1,9 +1,10 @@
 /**
- * TDJ NEXUS - Minimalist Wallpaper HUD Overlay & Interaction Indicator
+ * TDJ NEXUS - Minimalist HUD Overlay & Interaction Indicator
+ * Completely hides when Wallpaper Mode is active.
  */
 
 import React from 'react';
-import { Eye, Zap } from 'lucide-react';
+import { Zap } from 'lucide-react';
 import { ThemeConfig } from '../engine/types';
 
 interface WallpaperOverlayProps {
@@ -15,13 +16,17 @@ interface WallpaperOverlayProps {
 
 export const WallpaperOverlay: React.FC<WallpaperOverlayProps> = ({
   isWallpaperMode,
-  onExitWallpaperMode,
   onTriggerShockwave,
   theme
 }) => {
+  // Requirement 1: In TRUE CLEAN WALLPAPER MODE, hide ALL overlays, text, buttons and HUD.
+  if (isWallpaperMode) {
+    return null;
+  }
+
   return (
-    <div className="fixed bottom-4 left-6 right-6 z-20 pointer-events-none flex items-center justify-between select-none">
-      {/* Left side: Minimal Branding / Coordinates */}
+    <div className="fixed bottom-4 left-4 sm:left-6 right-4 sm:right-6 z-20 pointer-events-none flex items-center justify-between select-none animate-in fade-in duration-300">
+      {/* Left side: Minimal Branding */}
       <div className="pointer-events-auto flex items-center gap-3">
         <div 
           onClick={onTriggerShockwave}
@@ -33,29 +38,19 @@ export const WallpaperOverlay: React.FC<WallpaperOverlayProps> = ({
           />
           <span className="font-tech font-semibold text-slate-200 tracking-wider">TDJ NEXUS</span>
           <span aria-hidden="true" className="text-slate-600">·</span>
-          <span className="text-[11px] text-slate-400 font-mono hidden sm:inline">V1 LIVE</span>
+          <span className="text-[11px] text-slate-400 font-mono hidden sm:inline">V1.1 PRODUCTION</span>
         </div>
       </div>
 
-      {/* Right side: Quick Shortcut / Wallpaper Mode Pill */}
+      {/* Right side: Quick Keyboard Shortcut Hints */}
       <div className="pointer-events-auto flex items-center gap-2">
-        {isWallpaperMode ? (
-          <button
-            onClick={onExitWallpaperMode}
-            className="px-3 py-1.5 bg-black/60 hover:bg-black/80 backdrop-blur-md border border-cyan-500/40 hover:border-cyan-400 text-cyan-300 rounded-xl text-xs flex items-center gap-1.5 transition-all shadow-lg cursor-pointer"
-          >
-            <Eye className="w-3.5 h-3.5" />
-            <span>Show HUD (H)</span>
-          </button>
-        ) : (
-          <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-black/40 backdrop-blur-md border border-white/10 rounded-xl text-[11px] text-slate-400 font-mono">
-            <span><strong className="text-slate-300">Space / Click</strong> Shockwave</span>
-            <span aria-hidden="true" className="text-slate-600">·</span>
-            <span><strong className="text-slate-300">H</strong> Toggle HUD</span>
-            <span aria-hidden="true" className="text-slate-600">·</span>
-            <span><strong className="text-slate-300">1-6</strong> Themes</span>
-          </div>
-        )}
+        <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-black/40 backdrop-blur-md border border-white/10 rounded-xl text-[11px] text-slate-400 font-mono">
+          <span><strong className="text-slate-300">Space / Click</strong> Shockwave</span>
+          <span aria-hidden="true" className="text-slate-600">·</span>
+          <span><strong className="text-slate-300">H</strong> Clean Wallpaper</span>
+          <span aria-hidden="true" className="text-slate-600">·</span>
+          <span><strong className="text-slate-300">1-6</strong> Themes</span>
+        </div>
       </div>
     </div>
   );

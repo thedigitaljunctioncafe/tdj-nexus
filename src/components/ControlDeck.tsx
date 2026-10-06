@@ -1,6 +1,6 @@
 /**
- * TDJ NEXUS - Interactive Control Deck
- * Modular panel for real-time physics, procedural geometry, visual themes, and audio controls.
+ * TDJ NEXUS - Interactive Control Deck (V1.1 Production Upgrade)
+ * Real-time physics, procedural geometry, visual themes, quality levels, and audio controls.
  */
 
 import React, { useState } from 'react';
@@ -13,13 +13,20 @@ import {
   RotateCcw, 
   Zap, 
   Activity,
-  Compass,
   Radio,
   Grid,
   Shield,
-  Disc
+  Disc,
+  Gauge
 } from 'lucide-react';
-import { DEFAULT_CONFIG, NexusConfig, SystemStats, THEME_PRESETS, ThemeConfig } from '../engine/types';
+import { 
+  DEFAULT_CONFIG, 
+  NexusConfig, 
+  QualityLevel, 
+  SystemStats, 
+  THEME_PRESETS, 
+  ThemeConfig 
+} from '../engine/types';
 
 interface ControlDeckProps {
   isOpen: boolean;
@@ -40,7 +47,7 @@ export const ControlDeck: React.FC<ControlDeckProps> = ({
   stats,
   initialTab = 'themes'
 }) => {
-  const [activeTab, setActiveTab] = useState<'themes' | 'physics' | 'geometry' | 'audio' | 'telemetry'>(
+  const [activeTab, setActiveTab] = useState<'themes' | 'quality' | 'physics' | 'geometry' | 'audio' | 'telemetry'>(
     (initialTab as any) || 'themes'
   );
 
@@ -52,13 +59,21 @@ export const ControlDeck: React.FC<ControlDeckProps> = ({
     onUpdateConfig(DEFAULT_CONFIG);
   };
 
+  const qualityOptions: { id: QualityLevel; label: string; desc: string }[] = [
+    { id: 'auto', label: 'AUTO (Dynamic)', desc: 'Monitors frame rate and dynamically optimizes GPU workload to sustain 60 FPS' },
+    { id: 'low', label: 'LOW (Battery / iGPU)', desc: '4,000 particles · 1.0 DPR · Optimized for older laptops & low-power GPUs' },
+    { id: 'balanced', label: 'BALANCED', desc: '9,000 particles · 1.25 DPR · Smooth performance on standard machines' },
+    { id: 'high', label: 'HIGH (Dedicated GPU)', desc: '15,000 particles · 1.5 DPR · High-fidelity visual density & bloom' },
+    { id: 'ultra', label: 'ULTRA (Enthusiast)', desc: '24,000 particles · Native 2.0 DPR · Maximum volumetric density' }
+  ];
+
   return (
-    <aside className="fixed top-16 right-6 z-40 w-96 max-h-[calc(100vh-5rem)] flex flex-col bg-[#070a10]/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl overflow-hidden select-none transition-all animate-in fade-in slide-in-from-right-4 duration-200">
+    <aside className="fixed top-14 right-4 sm:right-6 z-40 w-[calc(100vw-2rem)] sm:w-96 max-h-[calc(100vh-4.5rem)] flex flex-col bg-[#070a10]/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl overflow-hidden select-none transition-all animate-in fade-in slide-in-from-right-4 duration-200">
       {/* Deck Header */}
-      <div className="flex items-center justify-between px-5 py-3.5 border-b border-white/10 bg-white/[0.02]">
+      <div className="flex items-center justify-between px-5 py-3 border-b border-white/10 bg-white/[0.02]">
         <div className="flex items-center gap-2.5">
           <div 
-            className="w-2.5 h-2.5 rounded-full" 
+            className="w-2.5 h-2.5 rounded-full animate-pulse" 
             style={{ backgroundColor: currentTheme.primaryColor }}
           />
           <h3 className="text-sm font-semibold text-white font-tech tracking-wide">
@@ -68,14 +83,14 @@ export const ControlDeck: React.FC<ControlDeckProps> = ({
         <div className="flex items-center gap-1">
           <button
             onClick={handleReset}
-            className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-white/10 transition-colors text-xs flex items-center gap-1"
+            className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-white/10 transition-colors text-xs flex items-center gap-1 cursor-pointer"
             title="Reset to Defaults"
           >
             <RotateCcw className="w-3.5 h-3.5" />
           </button>
           <button
             onClick={onClose}
-            className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-white/10 transition-colors"
+            className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-white/10 transition-colors cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
@@ -86,7 +101,7 @@ export const ControlDeck: React.FC<ControlDeckProps> = ({
       <div className="flex items-center gap-1 p-2 border-b border-white/10 bg-black/40 overflow-x-auto text-xs">
         <button
           onClick={() => setActiveTab('themes')}
-          className={`px-3 py-1.5 font-medium rounded-lg transition-colors flex items-center gap-1.5 whitespace-nowrap ${
+          className={`px-2.5 py-1.5 font-medium rounded-lg transition-colors flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
             activeTab === 'themes'
               ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
               : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
@@ -97,20 +112,32 @@ export const ControlDeck: React.FC<ControlDeckProps> = ({
         </button>
 
         <button
+          onClick={() => setActiveTab('quality')}
+          className={`px-2.5 py-1.5 font-medium rounded-lg transition-colors flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
+            activeTab === 'quality'
+              ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
+          }`}
+        >
+          <Gauge className="w-3.5 h-3.5" />
+          <span>Quality</span>
+        </button>
+
+        <button
           onClick={() => setActiveTab('physics')}
-          className={`px-3 py-1.5 font-medium rounded-lg transition-colors flex items-center gap-1.5 whitespace-nowrap ${
+          className={`px-2.5 py-1.5 font-medium rounded-lg transition-colors flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
             activeTab === 'physics'
               ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
               : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
           }`}
         >
           <Sliders className="w-3.5 h-3.5" />
-          <span>Particles</span>
+          <span>Swarm</span>
         </button>
 
         <button
           onClick={() => setActiveTab('geometry')}
-          className={`px-3 py-1.5 font-medium rounded-lg transition-colors flex items-center gap-1.5 whitespace-nowrap ${
+          className={`px-2.5 py-1.5 font-medium rounded-lg transition-colors flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
             activeTab === 'geometry'
               ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
               : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
@@ -122,7 +149,7 @@ export const ControlDeck: React.FC<ControlDeckProps> = ({
 
         <button
           onClick={() => setActiveTab('audio')}
-          className={`px-3 py-1.5 font-medium rounded-lg transition-colors flex items-center gap-1.5 whitespace-nowrap ${
+          className={`px-2.5 py-1.5 font-medium rounded-lg transition-colors flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
             activeTab === 'audio'
               ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
               : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
@@ -134,7 +161,7 @@ export const ControlDeck: React.FC<ControlDeckProps> = ({
 
         <button
           onClick={() => setActiveTab('telemetry')}
-          className={`px-3 py-1.5 font-medium rounded-lg transition-colors flex items-center gap-1.5 whitespace-nowrap ${
+          className={`px-2.5 py-1.5 font-medium rounded-lg transition-colors flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
             activeTab === 'telemetry'
               ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
               : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
@@ -146,35 +173,34 @@ export const ControlDeck: React.FC<ControlDeckProps> = ({
       </div>
 
       {/* Tab Panels */}
-      <div className="flex-1 overflow-y-auto p-5 space-y-5 text-xs text-slate-300">
+      <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4 text-xs text-slate-300">
         {/* TAB 1: THEMES */}
         {activeTab === 'themes' && (
-          <div className="space-y-4">
+          <div className="space-y-3">
             <div className="text-[11px] text-slate-400">
               Select an atmospheric visual spectrum preset:
             </div>
 
-            <div className="grid grid-cols-1 gap-2.5">
+            <div className="grid grid-cols-1 gap-2">
               {Object.values(THEME_PRESETS).map((preset: ThemeConfig) => {
                 const isSelected = config.themeId === preset.id;
                 return (
                   <button
                     key={preset.id}
                     onClick={() => onUpdateConfig({ themeId: preset.id })}
-                    className={`flex items-start gap-3 p-3 rounded-xl text-left transition-all border ${
+                    className={`flex items-start gap-3 p-3 rounded-xl text-left transition-all border cursor-pointer ${
                       isSelected
                         ? 'bg-white/10 border-cyan-400/60 shadow-lg shadow-cyan-500/10'
                         : 'bg-white/[0.02] border-white/5 hover:bg-white/[0.06] hover:border-white/20'
                     }`}
                   >
-                    {/* Swatch preview */}
                     <div className="flex items-center gap-1.5 mt-0.5 shrink-0">
                       <span 
-                        className="w-4 h-4 rounded-full border border-white/20 shadow-sm"
+                        className="w-3.5 h-3.5 rounded-full border border-white/20 shadow-sm"
                         style={{ backgroundColor: preset.primaryColor }}
                       />
                       <span 
-                        className="w-3 h-3 rounded-full border border-white/20"
+                        className="w-2.5 h-2.5 rounded-full border border-white/20"
                         style={{ backgroundColor: preset.secondaryColor }}
                       />
                     </div>
@@ -190,7 +216,7 @@ export const ControlDeck: React.FC<ControlDeckProps> = ({
                           </span>
                         )}
                       </div>
-                      <p className="text-[11px] text-slate-400 mt-1 leading-relaxed line-clamp-2">
+                      <p className="text-[11px] text-slate-400 mt-0.5 leading-relaxed line-clamp-2">
                         {preset.description}
                       </p>
                     </div>
@@ -201,7 +227,55 @@ export const ControlDeck: React.FC<ControlDeckProps> = ({
           </div>
         )}
 
-        {/* TAB 2: PARTICLES & PHYSICS */}
+        {/* TAB 2: QUALITY & ADAPTIVE RENDERING */}
+        {activeTab === 'quality' && (
+          <div className="space-y-3.5">
+            <div className="p-3 bg-cyan-950/20 border border-cyan-500/20 rounded-xl space-y-1">
+              <div className="font-semibold text-cyan-300 flex items-center gap-1.5">
+                <Gauge className="w-3.5 h-3.5" />
+                <span>Adaptive GPU Performance Engine</span>
+              </div>
+              <p className="text-[11px] text-slate-400 leading-relaxed">
+                Dynamically throttles particle buffers and pixel ratio to prevent hardware stutter and maintain 60 FPS.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+                Rendering Quality Profile
+              </span>
+
+              <div className="grid grid-cols-1 gap-2">
+                {qualityOptions.map((opt) => {
+                  const isSelected = config.quality === opt.id;
+                  return (
+                    <button
+                      key={opt.id}
+                      onClick={() => onUpdateConfig({ quality: opt.id })}
+                      className={`p-3 rounded-xl text-left transition-all border cursor-pointer ${
+                        isSelected
+                          ? 'bg-cyan-500/15 border-cyan-400/60 text-white'
+                          : 'bg-white/[0.02] border-white/5 hover:bg-white/[0.06] hover:border-white/20 text-slate-300'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold font-tech tracking-wide">{opt.label}</span>
+                        {isSelected && (
+                          <span className="text-[10px] text-cyan-400 font-mono">SELECTED</span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
+                        {opt.desc}
+                      </p>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 3: PARTICLES & PHYSICS */}
         {activeTab === 'physics' && (
           <div className="space-y-4">
             {/* Particle Density */}
@@ -218,11 +292,11 @@ export const ControlDeck: React.FC<ControlDeckProps> = ({
                 max={25000}
                 step={1000}
                 value={config.particleCount}
-                onChange={(e) => onUpdateConfig({ particleCount: parseInt(e.target.value, 10) })}
+                onChange={(e) => onUpdateConfig({ particleCount: parseInt(e.target.value, 10), quality: 'balanced' })}
                 className="w-full accent-cyan-400 cursor-pointer h-1.5 bg-slate-800 rounded-lg"
               />
               <div className="flex justify-between text-[10px] text-slate-500 font-mono">
-                <span>2k (Battery Saver)</span>
+                <span>2k (Saver)</span>
                 <span>12k (Balanced)</span>
                 <span>25k (Ultra)</span>
               </div>
@@ -304,7 +378,6 @@ export const ControlDeck: React.FC<ControlDeckProps> = ({
               />
             </div>
 
-            {/* Shockwave Blast Trigger Button */}
             <button
               onClick={onTriggerShockwave}
               className="w-full py-2.5 px-4 bg-gradient-to-r from-cyan-500/20 to-blue-500/20 hover:from-cyan-500/30 hover:to-blue-500/30 border border-cyan-500/40 rounded-xl text-cyan-300 font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-lg"
@@ -315,10 +388,9 @@ export const ControlDeck: React.FC<ControlDeckProps> = ({
           </div>
         )}
 
-        {/* TAB 3: NEXUS CORE GEOMETRY */}
+        {/* TAB 4: NEXUS CORE GEOMETRY */}
         {activeTab === 'geometry' && (
           <div className="space-y-4">
-            {/* Core Rotation Speed */}
             <div className="space-y-2">
               <div className="flex items-center justify-between text-slate-300">
                 <span className="font-medium">Core Gyro Rotation</span>
@@ -337,7 +409,6 @@ export const ControlDeck: React.FC<ControlDeckProps> = ({
               />
             </div>
 
-            {/* Core Scale */}
             <div className="space-y-2">
               <div className="flex items-center justify-between text-slate-300">
                 <span className="font-medium">Core Dimensional Scale</span>
@@ -356,7 +427,6 @@ export const ControlDeck: React.FC<ControlDeckProps> = ({
               />
             </div>
 
-            {/* Component Toggles */}
             <div className="space-y-2.5 pt-2 border-t border-white/5">
               <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
                 Procedural Sub-Systems
@@ -417,20 +487,19 @@ export const ControlDeck: React.FC<ControlDeckProps> = ({
           </div>
         )}
 
-        {/* TAB 4: PROCEDURAL AUDIO */}
+        {/* TAB 5: PROCEDURAL AUDIO */}
         {activeTab === 'audio' && (
           <div className="space-y-4">
             <div className="p-3 bg-cyan-950/20 border border-cyan-500/20 rounded-xl space-y-1.5 text-xs text-slate-300">
               <div className="font-semibold text-cyan-300 flex items-center gap-1.5">
                 <Volume2 className="w-3.5 h-3.5" />
-                <span>Zero-Asset Procedural Web Audio</span>
+                <span>100% Offline Procedural Web Audio</span>
               </div>
               <p className="text-[11px] text-slate-400">
-                100% synthesized locally in real-time. No streaming audio files or bandwidth usage.
+                Zero external audio files. Real-time synthesized harmonics, kinetic shockwave impacts, and sub-bass drones.
               </p>
             </div>
 
-            {/* Master Sound Toggle */}
             <label className="flex items-center justify-between p-3 bg-white/[0.02] border border-white/5 rounded-lg cursor-pointer hover:bg-white/[0.05]">
               <div>
                 <div className="font-medium text-slate-200">Interactive Sound Effects</div>
@@ -444,7 +513,6 @@ export const ControlDeck: React.FC<ControlDeckProps> = ({
               />
             </label>
 
-            {/* Ambient Drone Toggle */}
             <label className="flex items-center justify-between p-3 bg-white/[0.02] border border-white/5 rounded-lg cursor-pointer hover:bg-white/[0.05]">
               <div>
                 <div className="font-medium text-slate-200">Cosmic Ambient Drone</div>
@@ -458,7 +526,6 @@ export const ControlDeck: React.FC<ControlDeckProps> = ({
               />
             </label>
 
-            {/* Master Volume */}
             <div className="space-y-2 pt-2">
               <div className="flex items-center justify-between text-slate-300">
                 <span className="font-medium">Master Audio Volume</span>
@@ -479,7 +546,7 @@ export const ControlDeck: React.FC<ControlDeckProps> = ({
           </div>
         )}
 
-        {/* TAB 5: REAL-TIME TELEMETRY */}
+        {/* TAB 6: REAL-TIME TELEMETRY */}
         {activeTab === 'telemetry' && (
           <div className="space-y-3 font-mono">
             <div className="p-3 bg-white/[0.02] border border-white/10 rounded-xl space-y-2">
@@ -495,6 +562,16 @@ export const ControlDeck: React.FC<ControlDeckProps> = ({
               <div className="flex justify-between items-center py-1 border-b border-white/5">
                 <span className="text-slate-400">Frame Time</span>
                 <span className="text-cyan-400 tabular-nums">{stats.frameTime} ms</span>
+              </div>
+
+              <div className="flex justify-between items-center py-1 border-b border-white/5">
+                <span className="text-slate-400">Active Quality Tier</span>
+                <span className="text-purple-400 font-bold uppercase">{stats.effectiveQuality}</span>
+              </div>
+
+              <div className="flex justify-between items-center py-1 border-b border-white/5">
+                <span className="text-slate-400">GPU Device Pixel Ratio</span>
+                <span className="text-amber-400 tabular-nums">{stats.gpuDpr}x</span>
               </div>
 
               <div className="flex justify-between items-center py-1 border-b border-white/5">
@@ -514,7 +591,7 @@ export const ControlDeck: React.FC<ControlDeckProps> = ({
             </div>
 
             <div className="text-[10px] text-slate-500 font-sans leading-relaxed">
-              * Pipeline rendered with ACES Filmic Tone Mapping and Sub-Pixel Anti-Aliasing on WebGL 2.0.
+              * Pipeline rendered with ACES Filmic Tone Mapping, Shader-based Cosmic Nebula and Adaptive GPU Scaling.
             </div>
           </div>
         )}
