@@ -278,38 +278,33 @@ export class NexusCore {
   }
 
   public applyTheme(theme: ThemeConfig) {
-    const primary = new THREE.Color(theme.primaryColor);
-    const secondary = new THREE.Color(theme.secondaryColor);
-    const accent = new THREE.Color(theme.accentColor);
-    const coreGlow = new THREE.Color(theme.coreGlowColor);
-
     // Singularity shader uniforms
-    this.coreShaderMaterial.uniforms.uColorPrimary.value.copy(primary);
-    this.coreShaderMaterial.uniforms.uColorAccent.value.copy(accent);
-    this.coreShaderMaterial.uniforms.uColorCoreGlow.value.copy(coreGlow);
+    this.coreShaderMaterial.uniforms.uColorPrimary.value.set(theme.primaryColor);
+    this.coreShaderMaterial.uniforms.uColorAccent.value.set(theme.accentColor);
+    this.coreShaderMaterial.uniforms.uColorCoreGlow.value.set(theme.coreGlowColor);
 
     // Wireframe & nucleus
-    (this.singularityWireframe.material as THREE.LineBasicMaterial).color.copy(accent);
-    (this.innerNucleus.material as THREE.MeshBasicMaterial).color.copy(primary);
+    (this.singularityWireframe.material as THREE.LineBasicMaterial).color.set(theme.accentColor);
+    (this.innerNucleus.material as THREE.MeshBasicMaterial).color.set(theme.primaryColor);
 
     // Gyro rings
     this.gyroMaterials.forEach(mat => {
-      mat.color.copy(secondary);
-      mat.emissive.copy(primary);
+      mat.color.set(theme.secondaryColor);
+      mat.emissive.set(theme.primaryColor);
     });
 
     // Shield shards
     this.shieldShards.forEach(shard => {
       const mat = shard.material as THREE.MeshStandardMaterial;
-      mat.emissive.copy(secondary);
+      mat.emissive.set(theme.secondaryColor);
     });
 
     // Lattice cage
-    (this.latticeCage.material as THREE.LineBasicMaterial).color.copy(primary);
+    (this.latticeCage.material as THREE.LineBasicMaterial).color.set(theme.primaryColor);
 
     // Polar jets
     this.polarJetMeshes.forEach(mesh => {
-      (mesh.material as THREE.MeshBasicMaterial).color.copy(accent);
+      (mesh.material as THREE.MeshBasicMaterial).color.set(theme.accentColor);
     });
   }
 

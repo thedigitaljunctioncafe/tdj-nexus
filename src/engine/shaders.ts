@@ -186,7 +186,8 @@ export const CosmicNebulaShader = {
     uColorPrimary: { value: new THREE.Color('#00f0ff') },
     uColorSecondary: { value: new THREE.Color('#0ea5e9') },
     uColorDeep: { value: new THREE.Color('#02040a') },
-    uDensity: { value: 1.0 }
+    uDensity: { value: 1.0 },
+    uComplexity: { value: 3.0 }
   },
   vertexShader: `
     varying vec3 vWorldPosition;
@@ -207,6 +208,7 @@ export const CosmicNebulaShader = {
     uniform vec3 uColorSecondary;
     uniform vec3 uColorDeep;
     uniform float uDensity;
+    uniform float uComplexity;
 
     // Fast trigonometric procedural noise (0 external textures, pure WebGL)
     float hash(vec2 p) {
@@ -224,35 +226,48 @@ export const CosmicNebulaShader = {
       return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
     }
 
-    float fbm(vec2 p) {
-      float v = 0.0;
-      float a = 0.5;
-      vec2 shift = vec2(100.0);
-      mat2 rot = mat2(cos(0.5), sin(0.5), -sin(0.5), cos(0.5));
-      for (int i = 0; i < 3; ++i) {
-        v += a * noise(p);
-        p = rot * p * 2.0 + shift;
-        a *= 0.5;
-      }
-      return v;
-    }
-
     void main() {
       vec3 dir = normalize(vWorldPosition);
       vec2 uvCoord = vec2(atan(dir.z, dir.x) / 3.14159265, dir.y) * 2.0;
-
-      // Moving atmospheric turbulence drift
       float t = uTime * 0.025;
-      float q1 = fbm(uvCoord * 2.5 + vec2(t * 0.8, -t * 0.5));
-      float q2 = fbm(uvCoord * 4.0 + vec2(-t * 0.6, t * 0.7) + q1 * 1.5);
-      
-      float cloud = smoothstep(0.35, 0.85, q2);
+
+      float cloud = 0.0;
+
+      // Adaptive complexity tiers
+      if (uComplexity < 1.5) {
+        // LOW: 1-Octave simple atmospheric wash (minimal GPU instructions)
+        float n1 = noise(uvCoord * 2.2 + vec2(t * 0.5, -t * 0.3));
+        float n2 = noise(uvCoord * 3.5 - vec2(t * 0.3, -t * 0.4));
+        cloud = smoothstep(0.4, 0.82, n1 * 0.6 + n2 * 0.4);
+      } else if (uComplexity < 2.5) {
+        // BALANCED: 2-Octave FBM
+        float n = 0.55 * noise(uvCoord * 2.5 + vec2(t * 0.7, -t * 0.4));
+        n += 0.35 * noise(uvCoord * 5.0 + vec2(-t * 0.5, t * 0.6));
+        cloud = smoothstep(0.38, 0.85, n);
+      } else if (uComplexity < 3.5) {
+        // HIGH: 3-Octave FBM with domain turbulence
+        float q = 0.5 * noise(uvCoord * 2.5 + vec2(t * 0.8, -t * 0.5));
+        q += 0.3 * noise(uvCoord * 4.8 + vec2(-t * 0.6, t * 0.7));
+        float n = 0.5 * noise(uvCoord * 3.0 + q * 1.4);
+        n += 0.3 * noise(uvCoord * 6.0 + q * 0.8);
+        cloud = smoothstep(0.35, 0.85, n);
+      } else {
+        // ULTRA: 4-Octave High-Detail Cosmic Turbulence
+        float q1 = 0.5 * noise(uvCoord * 2.5 + vec2(t * 0.8, -t * 0.5));
+        q1 += 0.25 * noise(uvCoord * 5.0 + vec2(-t * 0.6, t * 0.7));
+        q1 += 0.15 * noise(uvCoord * 9.5 + vec2(t * 0.4, t * 0.3));
+
+        float q2 = 0.5 * noise(uvCoord * 3.5 + q1 * 1.5);
+        q2 += 0.25 * noise(uvCoord * 7.0 + q1 * 0.8);
+        q2 += 0.12 * noise(uvCoord * 14.0 - q1 * 0.5);
+        cloud = smoothstep(0.32, 0.86, q2);
+      }
 
       // Dual-gradient chromatic color mapping
       vec3 cloudCol = mix(uColorDeep, uColorSecondary, cloud);
       cloudCol = mix(cloudCol, uColorPrimary, pow(cloud, 2.2));
 
-      float alpha = cloud * 0.18 * uDensity;
+      float alpha = cloud * 0.19 * uDensity;
       if (alpha < 0.005) discard;
 
       gl_FragColor = vec4(cloudCol, alpha);

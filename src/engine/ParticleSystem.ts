@@ -142,8 +142,8 @@ export class ParticleSystem {
   }
 
   public applyTheme(theme: ThemeConfig) {
-    this.shaderMaterial.uniforms.uColorPrimary.value.copy(new THREE.Color(theme.primaryColor));
-    this.shaderMaterial.uniforms.uColorSecondary.value.copy(new THREE.Color(theme.secondaryColor));
+    this.shaderMaterial.uniforms.uColorPrimary.value.set(theme.primaryColor);
+    this.shaderMaterial.uniforms.uColorSecondary.value.set(theme.secondaryColor);
   }
 
   public setPixelRatio(dpr: number) {

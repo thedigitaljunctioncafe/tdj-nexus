@@ -30,6 +30,7 @@ export default function App() {
   const [deckTab, setDeckTab] = useState<string>('themes');
   const [isGuideOpen, setIsGuideOpen] = useState<boolean>(false);
   const [modeNotice, setModeNotice] = useState<string | null>(null);
+  const noticeTimerRef = useRef<number | null>(null);
 
   // Initialize Three.js Scene
   useEffect(() => {
@@ -41,6 +42,9 @@ export default function App() {
     sceneRef.current = scene;
 
     return () => {
+      if (noticeTimerRef.current) {
+        window.clearTimeout(noticeTimerRef.current);
+      }
       scene.dispose();
       sceneRef.current = null;
     };
@@ -57,8 +61,11 @@ export default function App() {
     });
 
     if (newConfig.wallpaperMode !== undefined) {
+      if (noticeTimerRef.current) {
+        window.clearTimeout(noticeTimerRef.current);
+      }
       setModeNotice(newConfig.wallpaperMode ? 'Clean Wallpaper Mode Active (Press H to restore UI)' : 'UI Restored');
-      setTimeout(() => setModeNotice(null), 2500);
+      noticeTimerRef.current = window.setTimeout(() => setModeNotice(null), 2500);
     }
   }, []);
 

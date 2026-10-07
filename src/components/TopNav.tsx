@@ -70,7 +70,7 @@ export const TopNav: React.FC<TopNavProps> = ({
           className="hover:text-white transition-colors cursor-pointer flex items-center gap-1.5"
         >
           <Gauge className="w-3.5 h-3.5 text-purple-400" />
-          <span className="uppercase">{config.quality} Quality</span>
+          <span className="uppercase">{config.quality === 'auto' ? `Auto: ${stats.effectiveQuality}` : `${config.quality} Quality`}</span>
         </button>
 
         <button

@@ -1,5 +1,5 @@
 /**
- * TDJ NEXUS - Master 3D Scene Orchestrator (V1.1 Production Upgrade)
+ * TDJ NEXUS - Master 3D Scene Orchestrator (V1.1 Production Patch)
  * Connects NexusCore, ParticleSystem, ShockwaveSystem, Shader-based Nebula, Adaptive Performance, and Cinematic Camera.
  */
 
@@ -14,7 +14,7 @@ import {
   SystemStats, 
   THEME_PRESETS, 
   ThemeConfig, 
-  QualityLevel,
+  QualityLevel, 
   QUALITY_PRESETS 
 } from './types';
 
@@ -49,13 +49,16 @@ export class NexusScene {
   private animationFrameId: number | null = null;
   private clock: THREE.Clock;
 
-  // Cinematic Camera & Parallax (Pre-allocated, 0 allocations per frame)
+  // Pre-allocated math objects (TRUE ZERO-ALLOCATION RENDER LOOP & INTERACTION)
   private mouseNorm: THREE.Vector2 = new THREE.Vector2(0, 0);
   private targetMouseNorm: THREE.Vector2 = new THREE.Vector2(0, 0);
   private cursor3D: THREE.Vector3 = new THREE.Vector3(0, 0, 0);
   private raycaster: THREE.Raycaster = new THREE.Raycaster();
   private planeZ: THREE.Plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
   private camLookTarget: THREE.Vector3 = new THREE.Vector3(0, 0, 0);
+  private tempPointerVec2: THREE.Vector2 = new THREE.Vector2(0, 0);
+  private tempIntersectVec3: THREE.Vector3 = new THREE.Vector3(0, 0, 0);
+  private defaultShockwaveOrigin: THREE.Vector3 = new THREE.Vector3(0, 0, 0);
   private baseCamDistance: number = 22.0;
 
   // Adaptive Performance Monitoring
@@ -146,7 +149,7 @@ export class NexusScene {
       side: THREE.DoubleSide,
       depthWrite: false
     });
-    this.gridMaterial.uniforms.uGridColor.value = new THREE.Color(this.theme.gridColor);
+    this.gridMaterial.uniforms.uGridColor.value.set(this.theme.gridColor);
 
     this.gridGeo = new THREE.PlaneGeometry(180, 180);
     this.spatialGridBottom = new THREE.Mesh(this.gridGeo, this.gridMaterial);
@@ -184,17 +187,13 @@ export class NexusScene {
   }
 
   private updateCameraFraming(aspect: number) {
-    // Dynamic distance calculation to keep Nexus Core beautifully centered across 32:9, 21:9, 16:9, and 9:16 portrait
     if (aspect < 1.0) {
-      // Portrait / Mobile: pull back camera so wide gyro rings don't clip
       this.baseCamDistance = 22.0 / aspect * 0.75;
       this.camera.fov = Math.min(75, this.config.fov * 1.15);
     } else if (aspect > 2.2) {
-      // Ultra-wide (21:9, 32:9): keep immersive focal scale
       this.baseCamDistance = 21.0;
       this.camera.fov = Math.max(45, this.config.fov * 0.9);
     } else {
-      // Standard 16:9 / 16:10
       this.baseCamDistance = 22.0;
       this.camera.fov = this.config.fov;
     }
@@ -203,33 +202,41 @@ export class NexusScene {
   }
 
   private updateNebulaUniforms() {
-    this.nebulaMaterial.uniforms.uColorPrimary.value.copy(new THREE.Color(this.theme.primaryColor));
-    this.nebulaMaterial.uniforms.uColorSecondary.value.copy(new THREE.Color(this.theme.secondaryColor));
-    this.nebulaMaterial.uniforms.uColorDeep.value.copy(new THREE.Color(this.theme.backgroundColor));
+    this.nebulaMaterial.uniforms.uColorPrimary.value.set(this.theme.primaryColor);
+    this.nebulaMaterial.uniforms.uColorSecondary.value.set(this.theme.secondaryColor);
+    this.nebulaMaterial.uniforms.uColorDeep.value.set(this.theme.backgroundColor);
   }
 
   private applyQualitySettings() {
     let effectiveDpr = Math.min(window.devicePixelRatio, 2.0);
     let targetParticleCount = this.config.particleCount;
+    let targetComplexity = 3.0;
 
     if (this.config.quality !== 'auto') {
       const preset = QUALITY_PRESETS[this.config.quality];
       effectiveDpr = Math.min(window.devicePixelRatio, preset.maxDpr);
       targetParticleCount = preset.particleCount;
+      targetComplexity = preset.nebulaComplexity;
       if (this.particles) {
         this.particles.setParticleSize(preset.particleSize);
       }
     } else {
-      // Adaptive mode
       const tiers: (keyof typeof QUALITY_PRESETS)[] = ['low', 'balanced', 'high', 'ultra'];
       const currentTierKey = tiers[this.currentAutoTier];
       const preset = QUALITY_PRESETS[currentTierKey];
       effectiveDpr = Math.min(window.devicePixelRatio, preset.maxDpr);
       targetParticleCount = preset.particleCount;
+      targetComplexity = preset.nebulaComplexity;
+      if (this.particles) {
+        this.particles.setParticleSize(preset.particleSize);
+      }
     }
 
     this.currentDpr = effectiveDpr;
     this.renderer.setPixelRatio(effectiveDpr);
+    if (this.nebulaMaterial) {
+      this.nebulaMaterial.uniforms.uComplexity.value = targetComplexity;
+    }
     if (this.particles) {
       this.particles.setParticleCount(targetParticleCount);
       this.particles.setPixelRatio(effectiveDpr);
@@ -278,22 +285,26 @@ export class NexusScene {
     const x = (e.clientX / window.innerWidth) * 2 - 1;
     const y = -(e.clientY / window.innerHeight) * 2 + 1;
     
-    this.raycaster.setFromCamera(new THREE.Vector2(x, y), this.camera);
-    const intersect = new THREE.Vector3();
-    this.raycaster.ray.intersectPlane(this.planeZ, intersect);
+    this.tempPointerVec2.set(x, y);
+    this.raycaster.setFromCamera(this.tempPointerVec2, this.camera);
+    const hit = this.raycaster.ray.intersectPlane(this.planeZ, this.tempIntersectVec3);
 
-    const spawnPos = intersect || this.cursor3D;
-    this.triggerShockwave(spawnPos, this.config.shockwaveIntensity);
-
-    if (this.config.soundEnabled) {
-      audioSynth.playShockwave(this.config.shockwaveIntensity);
-    }
+    const spawnPos = hit ? this.tempIntersectVec3 : this.cursor3D;
+    this.triggerShockwave(spawnPos, this.config.shockwaveIntensity, true);
   };
 
-  public triggerShockwave(origin: THREE.Vector3 = new THREE.Vector3(0, 0, 0), intensity: number = 1.0) {
+  /**
+   * Triggers visual shockwave + core resonance pulse + synthesized audio in full sync
+   */
+  public triggerShockwave(origin?: THREE.Vector3, intensity: number = 1.0, playAudio: boolean = true) {
+    const spawnOrigin = origin || this.defaultShockwaveOrigin;
     this.core.triggerShockwave(intensity);
-    this.particles.triggerShockwave(origin, intensity);
-    this.shockwaves.spawnShockwave(origin, intensity);
+    this.particles.triggerShockwave(spawnOrigin, intensity);
+    this.shockwaves.spawnShockwave(spawnOrigin, intensity);
+
+    if (playAudio && this.config.soundEnabled) {
+      audioSynth.playShockwave(intensity);
+    }
   }
 
   private animate() {
@@ -302,11 +313,10 @@ export class NexusScene {
     const delta = Math.min(this.clock.getDelta(), 0.1);
     const time = this.clock.getElapsedTime();
 
-    // 1. Cinematic Camera: Smooth Parallax & Subtle Idle Harmonic Breathing
+    // 1. Cinematic Camera: Smooth Parallax & Subtle Idle Harmonic Breathing (0 allocations)
     this.mouseNorm.lerp(this.targetMouseNorm, delta * 3.8);
     
     const parallax = this.config.parallaxStrength;
-    // Subtle Lissajous continuous drift for organic cinematic feel
     const idleDriftX = Math.sin(time * 0.35) * 0.8;
     const idleDriftY = Math.cos(time * 0.28) * 0.5;
 
@@ -317,7 +327,7 @@ export class NexusScene {
     this.camera.position.y += (targetCamY - this.camera.position.y) * (delta * 2.8);
     this.camera.lookAt(this.camLookTarget);
 
-    // 2. Update Subsystems (Zero per-frame allocations)
+    // 2. Update Subsystems
     this.core.update(delta, time, this.config.coreRotationSpeed);
     this.particles.update(
       delta,
@@ -343,7 +353,6 @@ export class NexusScene {
       const currentFps = Math.round(this.frameCount / elapsed);
       const info = this.renderer.info;
 
-      // Auto-tuning algorithm
       if (this.config.quality === 'auto') {
         if (currentFps < 45) {
           this.lowFpsCounter++;
@@ -443,12 +452,12 @@ export class NexusScene {
 
   public setTheme(theme: ThemeConfig) {
     this.theme = theme;
-    this.scene.background = new THREE.Color(theme.backgroundColor);
-    (this.scene.fog as THREE.FogExp2).color = new THREE.Color(theme.fogColor);
+    (this.scene.background as THREE.Color).set(theme.backgroundColor);
+    (this.scene.fog as THREE.FogExp2).color.set(theme.fogColor);
 
-    this.corePointLight.color.copy(new THREE.Color(theme.primaryColor));
-    this.rimLight.color.copy(new THREE.Color(theme.secondaryColor));
-    this.gridMaterial.uniforms.uGridColor.value.copy(new THREE.Color(theme.gridColor));
+    this.corePointLight.color.set(theme.primaryColor);
+    this.rimLight.color.set(theme.secondaryColor);
+    this.gridMaterial.uniforms.uGridColor.value.set(theme.gridColor);
 
     this.core.applyTheme(theme);
     this.particles.applyTheme(theme);

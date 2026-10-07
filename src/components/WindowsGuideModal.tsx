@@ -228,7 +228,11 @@ export const WindowsGuideModal: React.FC<WindowsGuideModalProps> = ({ isOpen, on
                 </div>
                 <div className="flex items-center justify-between p-3 bg-white/[0.02] border border-white/10 rounded-lg">
                   <span className="text-slate-300">Toggle Fullscreen Mode</span>
-                  <kbd className="px-2 py-1 bg-slate-800 border border-slate-700 rounded text-cyan-300 font-mono">F / F11</kbd>
+                  <div className="flex items-center gap-1.5 font-mono text-cyan-300 text-xs">
+                    <kbd className="px-2 py-1 bg-slate-800 border border-slate-700 rounded">F (App)</kbd>
+                    <span className="text-slate-500">/</span>
+                    <kbd className="px-2 py-1 bg-slate-800 border border-slate-700 rounded">F11 (Browser)</kbd>
+                  </div>
                 </div>
                 <div className="flex items-center justify-between p-3 bg-white/[0.02] border border-white/10 rounded-lg">
                   <span className="text-slate-300">Switch Theme Presets</span>

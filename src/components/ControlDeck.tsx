@@ -231,12 +231,21 @@ export const ControlDeck: React.FC<ControlDeckProps> = ({
         {activeTab === 'quality' && (
           <div className="space-y-3.5">
             <div className="p-3 bg-cyan-950/20 border border-cyan-500/20 rounded-xl space-y-1">
-              <div className="font-semibold text-cyan-300 flex items-center gap-1.5">
-                <Gauge className="w-3.5 h-3.5" />
-                <span>Adaptive GPU Performance Engine</span>
+              <div className="font-semibold text-cyan-300 flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <Gauge className="w-3.5 h-3.5" />
+                  <span>Adaptive GPU Engine</span>
+                </div>
+                {config.quality === 'auto' && (
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 uppercase">
+                    ACTIVE: {stats.effectiveQuality}
+                  </span>
+                )}
               </div>
               <p className="text-[11px] text-slate-400 leading-relaxed">
-                Dynamically throttles particle buffers and pixel ratio to prevent hardware stutter and maintain 60 FPS.
+                {config.quality === 'auto'
+                  ? `Currently maintaining 60 FPS by rendering ${stats.particleCount.toLocaleString()} particles at ${stats.gpuDpr}x DPR (${stats.effectiveQuality.toUpperCase()} tier).`
+                  : 'Dynamically throttles particle buffers and pixel ratio to prevent hardware stutter and maintain 60 FPS.'}
               </p>
             </div>
 
@@ -261,7 +270,9 @@ export const ControlDeck: React.FC<ControlDeckProps> = ({
                       <div className="flex items-center justify-between">
                         <span className="font-semibold font-tech tracking-wide">{opt.label}</span>
                         {isSelected && (
-                          <span className="text-[10px] text-cyan-400 font-mono">SELECTED</span>
+                          <span className="text-[10px] text-cyan-400 font-mono font-bold">
+                            {opt.id === 'auto' ? `AUTO (${stats.effectiveQuality.toUpperCase()})` : 'SELECTED'}
+                          </span>
                         )}
                       </div>
                       <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
@@ -282,8 +293,8 @@ export const ControlDeck: React.FC<ControlDeckProps> = ({
             <div className="space-y-2">
               <div className="flex items-center justify-between text-slate-300">
                 <span className="font-medium">Active Particle Density</span>
-                <span className="font-mono text-cyan-400 tabular-nums">
-                  {config.particleCount.toLocaleString()}
+                <span className="font-mono text-cyan-400 tabular-nums font-semibold">
+                  {stats.particleCount.toLocaleString()} {config.quality === 'auto' ? `(Auto - ${stats.effectiveQuality.toUpperCase()})` : 'P'}
                 </span>
               </div>
               <input
@@ -291,7 +302,7 @@ export const ControlDeck: React.FC<ControlDeckProps> = ({
                 min={2000}
                 max={25000}
                 step={1000}
-                value={config.particleCount}
+                value={stats.particleCount}
                 onChange={(e) => onUpdateConfig({ particleCount: parseInt(e.target.value, 10), quality: 'balanced' })}
                 className="w-full accent-cyan-400 cursor-pointer h-1.5 bg-slate-800 rounded-lg"
               />
@@ -300,6 +311,11 @@ export const ControlDeck: React.FC<ControlDeckProps> = ({
                 <span>12k (Balanced)</span>
                 <span>25k (Ultra)</span>
               </div>
+              {config.quality === 'auto' && (
+                <p className="text-[10px] text-cyan-400/80 font-mono mt-1">
+                  * Particle count is managed dynamically by Auto Quality to sustain 60 FPS.
+                </p>
+              )}
             </div>
 
             {/* Particle Flow Speed */}
